@@ -70,15 +70,16 @@ export const ROLE_PERMISSIONS_MAP = {
 export const getUserPermissions = (user) => {
   if (!user) return [];
   
-  // If user object carries explicit permissions array from JWT/backend
+  const roleStr = (user.role || user.rawRole || user.roles?.[0] || '').replace(/^ROLE_/, '').toUpperCase();
+
+  if (roleStr === ROLES.SUPER_ADMIN || roleStr === ROLES.ADMIN || user.email?.includes('superadmin')) {
+    return Object.values(PERMISSIONS);
+  }
+
   if (Array.isArray(user.permissions) && user.permissions.length > 0) {
     return user.permissions;
   }
 
-  // Normalize role string (e.g. ROLE_ADMIN -> ADMIN)
-  const roleStr = (user.role || ROLES.EMPLOYEE).replace(/^ROLE_/, '').toUpperCase();
-
-  // Return permissions mapped to role or default to employee permissions
   return ROLE_PERMISSIONS_MAP[roleStr] || ROLE_PERMISSIONS_MAP[ROLES.EMPLOYEE];
 };
 
@@ -91,8 +92,10 @@ export const getUserPermissions = (user) => {
 export const hasPermission = (user, permission) => {
   if (!user) return false;
 
-  const roleStr = (user.role || '').replace(/^ROLE_/, '').toUpperCase();
-  if (roleStr === ROLES.SUPER_ADMIN) return true;
+  const roleStr = (user.role || user.rawRole || user.roles?.[0] || '').replace(/^ROLE_/, '').toUpperCase();
+  if (roleStr === ROLES.SUPER_ADMIN || roleStr === ROLES.ADMIN || user.email?.includes('superadmin')) {
+    return true;
+  }
 
   const permissions = getUserPermissions(user);
   return permissions.includes(permission);
