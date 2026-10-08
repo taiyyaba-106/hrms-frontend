@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Obtain API Base URL from Vite Environment or fallback to Spring Boot default port 8081
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
+// Obtain API Base URL from Vite Environment or fallback to relative path (leveraging Vite proxy in dev)
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 /**
  * Token Management Helpers
@@ -101,7 +101,9 @@ export const handleApiError = (error) => {
       default:
         return {
           status: status || 500,
-          message: status === 500 ? 'Server error occurred. Please contact support.' : message,
+          message: (data && typeof data === 'object' && (data.message || data.error)) 
+            ? (data.message || data.error) 
+            : (status === 500 ? 'Server error occurred. Please contact support.' : message),
         };
     }
   } else if (error.request) {

@@ -26,6 +26,34 @@ export const removeStoredUser = () => {
   sessionStorage.removeItem(USER_KEY);
 };
 
+export const parseJwtPayload = (token) => {
+  try {
+    if (!token) return null;
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      window.atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    const parsed = JSON.parse(jsonPayload);
+    const rawRole = parsed.roles?.[0] || parsed.role || 'ROLE_USER';
+    const formattedRole = rawRole.replace('ROLE_', '').replace(/_/g, ' ');
+    return {
+      id: parsed.userId || parsed.id,
+      email: parsed.sub || parsed.email,
+      role: formattedRole,
+      rawRole: rawRole,
+      roles: parsed.roles || [rawRole],
+      permissions: parsed.permissions || [],
+    };
+  } catch (e) {
+    return null;
+  }
+};
+
 /**
  * Authentication Service API Endpoints
  */
@@ -42,15 +70,18 @@ const authService = {
     });
 
     const token = response.accessToken || response.token || response.data?.accessToken || response.data?.token;
-    const user = response.user || response.data?.user || response.userInfo || null;
+    let user = response.user || response.data?.user || response.userInfo || null;
 
     if (token) {
       setAuthToken(token, credentials.rememberMe !== false);
+      if (!user) {
+        user = parseJwtPayload(token);
+      }
       if (user) {
         setStoredUser(user, credentials.rememberMe !== false);
       }
     }
-    return response;
+    return { ...response, user };
   },
 
   /**

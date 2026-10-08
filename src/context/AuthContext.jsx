@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import authService, { getStoredUser, setStoredUser, removeStoredUser } from '../services/authService';
+import authService, { getStoredUser, setStoredUser, removeStoredUser, parseJwtPayload } from '../services/authService';
 import { getAuthToken, removeAuthToken } from '../services/apiClient';
 
 const AuthContext = createContext(null);
@@ -19,7 +19,14 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
-    const storedUser = getStoredUser();
+    let storedUser = getStoredUser();
+    if (!storedUser && token) {
+      storedUser = parseJwtPayload(token);
+      if (storedUser) {
+        setStoredUser(storedUser);
+      }
+    }
+
     if (storedUser) {
       setUser(storedUser);
       setIsAuthenticated(true);
@@ -33,16 +40,18 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       setStoredUser(userData);
     } catch (err) {
-      // If server returns 401 or token is invalid, clean up state
+      // If server returns 401 or 403, clean up state; for 404 or network error, keep decoded JWT user session
       if (err.status === 401 || err.status === 403) {
         removeAuthToken();
         removeStoredUser();
         setUser(null);
         setIsAuthenticated(false);
-      } else if (storedUser) {
-        // If offline / network error, retain cached user session
-        setUser(storedUser);
-        setIsAuthenticated(true);
+      } else {
+        const fallbackUser = storedUser || parseJwtPayload(token);
+        if (fallbackUser) {
+          setUser(fallbackUser);
+          setIsAuthenticated(true);
+        }
       }
     } finally {
       setIsLoading(false);
